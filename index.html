@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Score Ticker</title>
+<style>
+:root {
+  --bg: #090d14;
+  --surface: #111824;
+  --surface-hover: #172030;
+  --border: rgba(255, 255, 255, 0.08);
+  --fg: #f1f5f9;
+  --muted: #8b9bb4;
+  --live: #ff4757;
+  --live-glow: rgba(255, 71, 87, 0.18);
+  --ok: #2ed573;
+  --accent: #38bdf8;
+  --gold: #fbbf24;
+  --display: "Arial Narrow", "Impact", system-ui, -apple-system, sans-serif;
+  --body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1200px; margin-inline: auto; padding-inline: 20px; }
+
+.top {
+  padding-block: 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(9, 13, 20, 0.85);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.topin { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+h1 span { color: var(--accent); }
+.conn {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.conn.ok { color: var(--ok); border-color: rgba(46, 213, 115, 0.3); }
+.conn.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.conn.lost { color: var(--live); }
+.conn.lost .dot { background: var(--live); }
+
+.band {
+  background: #06090f;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+.track { display: flex; width: max-content; animation: slide var(--dur, 90s) linear infinite; }
+.track:hover { animation-play-state: paused; }
+.set { display: flex; align-items: center; gap: 24px; padding: 10px 24px 10px 0; }
+.mi {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.mi img { width: 18px; height: 18px; object-fit: contain; }
+.mi .lg { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: 0.1em; }
+.mi .win { color: var(--gold); }
+.mi .lose { color: var(--muted); }
+.mi .stt { font-family: var(--body); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+.mi .stt.live { color: var(--live); }
+.mi + .mi::before { content: ""; width: 1px; height: 14px; background: var(--border); margin-right: 16px; }
+@keyframes slide { to { transform: translateX(-50%); } }
+
+.spotlight-wrap { padding-top: 22px; }
+.spot-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.spot-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--live);
+}
+.pulse {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--live);
+  animation: pulse 1.6s infinite;
+}
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,71,87,0.7); } 70% { box-shadow: 0 0 0 8px rgba(255,71,87,0); } 100% { box-shadow: 0 0 0 0 rgba(255,71,87,0); } }
+.spot-ctl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--fg);
+  cursor: pointer; display: grid; place-items: center; font-size: 16px;
+}
+.nav:hover { background: var(--surface-hover); border-color: var(--accent); }
+
+.spot-card {
+  background: linear-gradient(145deg, #131c2b, #0e1420);
+  border: 1px solid rgba(255, 71, 87, 0.35);
+  box-shadow: 0 10px 30px -10px var(--live-glow);
+  border-radius: 12px;
+  padding: 18px 24px;
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.35s ease;
+}
+.spot-progress {
+  position: absolute; bottom: 0; left: 0; height: 3px; background: var(--live);
+  width: 100%; transform-origin: left;
+  animation: timer 6s linear infinite;
+}
+.spot-card:hover .spot-progress { animation-play-state: paused; }
+@keyframes timer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes fadeIn { from { opacity: 0.4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+.spot-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.spot-meta .live { color: var(--live); }
+.spot-grid { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; }
+.spot-team { display: flex; align-items: center; gap: 14px; }
+.spot-team.right { justify-content: flex-end; text-align: right; }
+.spot-logo { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+.spot-name { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1.1; }
+.spot-sub { font-size: 12px; color: var(--muted); }
+.spot-scores { display: flex; align-items: center; gap: 16px; font-family: var(--display); font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.spot-vs { font-size: 14px; color: var(--muted); font-family: var(--body); font-weight: 700; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 22px 8px; }
+.chip {
+  font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 16px; cursor: pointer; transition: 0.15s;
+}
+.chip:hover { color: var(--fg); border-color: rgba(255,255,255,0.2); }
+.chip[aria-pressed="true"] { background: var(--accent); color: #05080d; border-color: var(--accent); }
+
+.league { padding-top: 24px; }
+.league h2 {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 14px;
+  font-family: var(--display); font-size: 22px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.league h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.group-lbl { margin: 14px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.group-lbl.live { color: var(--live); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.game {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.game:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
+.game.is-live { border-left: 3px solid var(--live); }
+.gh { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.gh .live { color: var(--live); }
+
+.tm { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 4px; }
+.tm-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tm-logo { width: 24px; height: 24px; object-fit: contain; flex: none; }
+.tm-fallback { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.08); display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--muted); flex: none; }
+.tm-names { min-width: 0; }
+.ab { font-family: var(--display); font-size: 18px; font-weight: 800; letter-spacing: 0.03em; line-height: 1.1; }
+.nm { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc { font-family: var(--display); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tm.lose .ab, .tm.lose .sc { color: var(--muted); opacity: 0.7; }
+.win-pill { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(251, 191, 36, 0.15); color: var(--gold); }
+
+.empty { color: var(--muted); padding-block: 32px; text-align: center; }
+.foot { margin-top: 40px; padding-block: 20px 40px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .spot-grid { grid-template-columns: 1fr; text-align: left; gap: 12px; }
+  .spot-team.right { justify-content: flex-start; text-align: left; flex-direction: row-reverse; }
+  .spot-scores { justify-content: center; font-size: 36px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap topin">
+    <h1>SCORE<span>TICKER</span></h1>
+    <p class="conn" id="conn"><span class="dot"></span><span id="conn-text">Connecting...</span></p>
+  </div>
+</header>
+
+<div class="band" id="band" hidden>
+  <div class="track" id="track"></div>
+</div>
+
+<main class="wrap">
+  <section class="spotlight-wrap" id="spotlight" hidden>
+    <div class="spot-head">
+      <div class="spot-title"><span class="pulse"></span> Live Spotlight (<span id="spot-count">0</span>)</div>
+      <div class="spot-ctl">
+        <span id="spot-idx">1 / 1</span>
+        <button class="nav" id="prev-live" aria-label="Previous live game">‹</button>
+        <button class="nav" id="next-live" aria-label="Next live game">›</button>
+      </div>
+    </div>
+    <div id="spot-mount"></div>
+  </section>
+
+  <nav class="filters" id="filters"></nav>
+  <div id="board"><p class="empty">Loading live scores...</p></div>
+
+  <footer class="foot">
+    Live scores stream automatically in your local time zone. Hover over the top ticker or spotlight card to pause rotation.
+  </footer>
+</main>
+
+<script>
+const state = { leagues: [], filter: 'all', liveIdx: 0, hoverSpot: false };
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+const fmtTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+function logoImg(url, abbr, cls = 'tm-logo') {
+  if (!url) return `<span class="tm-fallback">${esc(abbr.slice(0, 3))}</span>`;
+  return `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function getSides(g, homeFirst) {
+  const first = homeFirst
+    ? { abbr: g.h, name: g.hn, logo: g.hl, score: g.hs, win: g.hw }
+    : { abbr: g.a, name: g.an, logo: g.al, score: g.as, win: g.aw };
+  const second = homeFirst
+    ? { abbr: g.a, name: g.an, logo: g.al, score: g.as, win: g.aw }
+    : { abbr: g.h, name: g.hn, logo: g.hl, score: g.hs, win: g.hw };
+
+  const hasNums = first.score !== null && second.score !== null;
+  if (g.s === 'final') {
+    if (first.win || (hasNums && first.score > second.score)) second.lose = true;
+    else if (second.win || (hasNums && second.score > first.score)) first.lose = true;
+  }
+  return [first, second];
+}
+
+function renderMarquee() {
+  const items = [];
+  for (const l of state.leagues) {
+    for (const g of l.games) {
+      const [s1, s2] = getSides(g, l.homeFirst);
+      const stt = g.s === 'pre' ? fmtTime(g.start) : g.detail;
+      const sc1 = s1.score !== null ? `<b>${s1.score}</b>` : '';
+      const sc2 = s2.score !== null ? `<b>${s2.score}</b>` : '';
+      items.push(`
+        <div class="mi">
+          <span class="lg">${esc(l.short)}</span>
+          ${s1.logo ? `<img src="${esc(s1.logo)}" alt="">` : ''}
+          <span class="${s1.lose ? 'lose' : (s1.win ? 'win' : '')}">${esc(s1.abbr)} ${sc1}</span>
+          <span class="stt">vs</span>
+          ${s2.logo ? `<img src="${esc(s2.logo)}" alt="">` : ''}
+          <span class="${s2.lose ? 'lose' : (s2.win ? 'win' : '')}">${esc(s2.abbr)} ${sc2}</span>
+          <span class="stt ${g.s === 'live' ? 'live' : ''}">${esc(stt)}</span>
+        </div>
+      `);
+    }
+  }
+  const band = document.getElementById('band');
+  const track = document.getElementById('track');
+  if (!items.length) { band.hidden = true; return; }
+  band.hidden = false;
+  const html = `<div class="set">${items.join('')}</div>`;
+  track.style.setProperty('--dur', `${Math.max(40, items.length * 5)}s`);
+  track.innerHTML = html + `<div class="set" aria-hidden="true">${items.join('')}</div>`;
+}
+
+function getAllLive() {
+  const list = [];
+  for (const l of state.leagues) {
+    for (const g of l.games) {
+      if (g.s === 'live') list.push({ league: l, game: g });
+    }
+  }
+  return list;
+}
+
+function renderSpotlight() {
+  const liveList = getAllLive();
+  const box = document.getElementById('spotlight');
+  if (!liveList.length) { box.hidden = true; return; }
+  box.hidden = false;
+  if (state.liveIdx >= liveList.length) state.liveIdx = 0;
+  if (state.liveIdx < 0) state.liveIdx = liveList.length - 1;
+
+  document.getElementById('spot-count').textContent = liveList.length;
+  document.getElementById('spot-idx').textContent = `${state.liveIdx + 1} / ${liveList.length}`;
+
+  const { league, game } = liveList[state.liveIdx];
+  const [s1, s2] = getSides(game, league.homeFirst);
+  const sc1 = s1.score !== null ? s1.score : '—';
+  const sc2 = s2.score !== null ? s2.score : '—';
+
+  document.getElementById('spot-mount').innerHTML = `
+    <div class="spot-card" key="${esc(game.id)}">
+      <div class="spot-meta">
+        <span>${esc(league.label)}</span>
+        <span class="live">● ${esc(game.detail || 'LIVE')}</span>
+      </div>
+      <div class="spot-grid">
+        <div class="spot-team">
+          ${logoImg(s1.logo, s1.abbr, 'spot-logo')}
+          <div>
+            <div class="spot-name">${esc(s1.abbr)}</div>
+            <div class="spot-sub">${esc(s1.name)}</div>
+          </div>
+        </div>
+        <div class="spot-scores">
+          <span>${sc1}</span>
+          <span class="spot-vs">VS</span>
+          <span>${sc2}</span>
+        </div>
+        <div class="spot-team right">
+          <div>
+            <div class="spot-name">${esc(s2.abbr)}</div>
+            <div class="spot-sub">${esc(s2.name)}</div>
+          </div>
+          ${logoImg(s2.logo, s2.abbr, 'spot-logo')}
+        </div>
+      </div>
+      ${liveList.length > 1 ? '<div class="spot-progress"></div>' : ''}
+    </div>
+  `;
+}
+
+function renderFilters() {
+  const nav = document.getElementById('filters');
+  const btns = [{ id: 'all', label: 'All Sports' }, ...state.leagues.map((l) => ({ id: l.id, label: l.label }))];
+  nav.innerHTML = btns.map((b) =>
+    `<button class="chip" data-id="${esc(b.id)}" aria-pressed="${state.filter === b.id}">${esc(b.label)}</button>`
+  ).join('');
+}
+
+function renderCard(g, league) {
+  const [s1, s2] = getSides(g, league.homeFirst);
+  const stt = g.s === 'pre' ? fmtTime(g.start) : g.detail;
+  const isUfc = league.id === 'ufc';
+
+  const rightVal = (side) => {
+    if (isUfc && g.s === 'final' && side.win) return `<span class="win-pill">WIN</span>`;
+    if (side.score === null) return '';
+    return `<div class="sc">${side.score}</div>`;
+  };
+
+  return `
+    <article class="game ${g.s === 'live' ? 'is-live' : ''}">
+      <div class="gh">
+        <span>${esc(league.short)}</span>
+        <span class="${g.s === 'live' ? 'live' : ''}">${esc(stt)}</span>
+      </div>
+      <div class="tm ${s1.lose ? 'lose' : ''}">
+        <div class="tm-left">
+          ${logoImg(s1.logo, s1.abbr)}
+          <div class="tm-names">
+            <div class="ab">${esc(s1.abbr)}</div>
+            <div class="nm">${esc(s1.name)}</div>
+          </div>
+        </div>
+        ${rightVal(s1)}
+      </div>
+      <div class="tm ${s2.lose ? 'lose' : ''}">
+        <div class="tm-left">
+          ${logoImg(s2.logo, s2.abbr)}
+          <div class="tm-names">
+            <div class="ab">${esc(s2.abbr)}</div>
+            <div class="nm">${esc(s2.name)}</div>
+          </div>
+        </div>
+        ${rightVal(s2)}
+      </div>
+    </article>
+  `;
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  const shown = state.leagues.filter((l) => state.filter === 'all' || l.id === state.filter);
+  if (!shown.length) { board.innerHTML = '<p class="empty">No leagues selected.</p>'; return; }
+
+  board.innerHTML = shown.map((l) => {
+    const live = l.games.filter((g) => g.s === 'live');
+    const pre = l.games.filter((g) => g.s === 'pre');
+    const final = l.games.filter((g) => g.s === 'final' || g.s === 'other');
+
+    if (!l.games.length) {
+      return `<section class="league"><h2>${esc(l.label)}</h2><p class="empty">No events scheduled in this window.</p></section>`;
+    }
+
+    const section = (title, list, isLive = false) => !list.length ? '' : `
+      <div class="group-lbl ${isLive ? 'live' : ''}">${title} (${list.length})</div>
+      <div class="grid">${list.map((g) => renderCard(g, l)).join('')}</div>
+    `;
+
+    return `
+      <section class="league">
+        <h2>${esc(l.label)}</h2>
+        ${section('Live Now', live, true)}
+        ${section('Upcoming', pre)}
+        ${section('Final / Completed', final)}
+      </section>
+    `;
+  }).join('');
+}
+
+function renderAll() {
+  renderMarquee();
+  renderSpotlight();
+  renderFilters();
+  renderBoard();
+}
+
+document.getElementById('filters').addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  state.filter = btn.dataset.id;
+  renderFilters();
+  renderBoard();
+});
+document.getElementById('prev-live').addEventListener('click', () => { state.liveIdx--; renderSpotlight(); });
+document.getElementById('next-live').addEventListener('click', () => { state.liveIdx++; renderSpotlight(); });
+
+const spotEl = document.getElementById('spotlight');
+spotEl.addEventListener('mouseenter', () => state.hoverSpot = true);
+spotEl.addEventListener('mouseleave', () => state.hoverSpot = false);
+
+setInterval(() => {
+  if (!state.hoverSpot && getAllLive().length > 1) {
+    state.liveIdx++;
+    renderSpotlight();
+  }
+}, 6000);
+
+function connect() {
+  const conn = document.getElementById('conn');
+  const text = document.getElementById('conn-text');
+  const es = new EventSource('/events');
+
+  es.addEventListener('open', () => {
+    conn.className = 'conn ok';
+    text.textContent = 'Live Feed Connected';
+  });
+  es.addEventListener('scores', (e) => {
+    const data = JSON.parse(e.data);
+    state.leagues = data.leagues || [];
+    renderAll();
+  });
+  es.addEventListener('error', () => {
+    conn.className = 'conn lost';
+    text.textContent = 'Reconnecting...';
+  });
+}
+
+fetch('/api/scores').then((r) => r.json()).then((d) => {
+  state.leagues = d.leagues || [];
+  renderAll();
+}).catch(() => {});
+
+connect();
+</script>
+</body>
+</html>
