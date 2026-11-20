@@ -1,9 +1,5 @@
 'use strict';
-/*
- * Score Ticker server.
- * Polls ESPN's public scoreboard endpoints, normalizes the data with logos,
- * and streams it to browsers over Server-Sent Events. No dependencies; needs Node 18+.
- */
+
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,8 +36,8 @@ const toScore = (v) => {
 function normalizeCompetition(ev, comp) {
   if (!comp || !Array.isArray(comp.competitors) || comp.competitors.length < 2) return null;
 
-  const home = comp.competitors.find((c) => c.homeAway === 'home') || comp.competitors[0];
-  const away = comp.competitors.find((c) => c.homeAway === 'away') || comp.competitors[1];
+  const home = comp.competitors.find((c) => c.homeAway === 'home') || comp.competitors.at(0);
+  const away = comp.competitors.find((c) => c.homeAway === 'away') || comp.competitors.at(1);
   if (!home || !away) return null;
 
   const status = comp.status || ev.status || {};
@@ -67,8 +63,8 @@ function normalizeCompetition(ev, comp) {
   const logo = (c) => {
     const e = entity(c);
     if (e.logo) return String(e.logo);
-    if (Array.isArray(e.logos) && e.logos[0]?.href) return String(e.logos[0].href);
-    if (e.flag?.href) return String(e.flag.href);
+    if (Array.isArray(e.logos) && e.logos.at(0) && e.logos.at(0).href) return String(e.logos.at(0).href);
+    if (e.flag && e.flag.href) return String(e.flag.href);
     return '';
   };
   const shows = s === 'live' || s === 'final';
@@ -96,7 +92,7 @@ function normalizeEvent(ev, isCombat) {
   if (isCombat) {
     return ev.competitions.map((comp) => normalizeCompetition(ev, comp)).filter(Boolean);
   }
-  const single = normalizeCompetition(ev, ev.competitions[0]);
+  const single = normalizeCompetition(ev, ev.competitions.at(0));
   return single ? [single] : [];
 }
 
@@ -109,7 +105,7 @@ function createApp(options = {}) {
   const cfg = {
     port: options.port ?? (Number(env.PORT) || 3000),
     host: options.host ?? (env.HOST || '0.0.0.0'),
-    espnBase: (options.espnBase || env.ESPN_BASE || 'https://site.api.espn.com/apis/site/v2/sports').replace(/\/$/, ''),
+    espnBase: (options.espnBase || env.ESPN_BASE || 'https://espn.com').replace(/\/$/, ''),
     pollLiveMs: options.pollLiveMs ?? (Number(env.POLL_LIVE_MS) || 20000),
     pollIdleMs: options.pollIdleMs ?? (Number(env.POLL_IDLE_MS) || 120000),
     daysBack: options.daysBack ?? (env.DAYS_BACK !== undefined ? Number(env.DAYS_BACK) : 1),
